@@ -120,3 +120,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   color: 0
   block_root: {fileID: 0}
+  step: -1
+  next_step: -1
+  position_offset: {x: 0, y: 0, z: 0}
+  vanish_timer: -1
+  slide_dir: -1
+  step_timer: 0
