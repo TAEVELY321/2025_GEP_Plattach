@@ -126,3 +126,5 @@ MonoBehaviour:
   vanish_timer: -1
   slide_dir: -1
   step_timer: 0
+  opague_material: {fileID: 0}
+  transparent_material: {fileID: 0}

@@ -8,17 +8,24 @@ public class BlockRoot : MonoBehaviour
     public GameObject BlockPrefab = null; // 만들어낼 블록의 프리팹
     public BlockControl[,] blocks; // 그리드
                                    // 블록을 만들어 내고 가로 9칸, 세로 9칸에 배치
+    private ScoreCounter score_counter = null; // 점수 카운터 ScoreCounter
     private GameObject main_camera = null; // 메인 카메라
     private BlockControl grabbed_block = null; // 잡은 블록
+    protected bool is_vanishing_prev = false; // 앞에서 발화했는가
+    public TextAsset levelData = null; // 레벨 데이터의 텍스트를 저장
+    public LevelControl level_control; // LevelControl를 저장
     void Start()
     {
         this.main_camera = GameObject.FindGameObjectWithTag("MainCamera");
+        this.score_counter = this.gameObject.GetComponent<ScoreCounter>();
+
     } // 카메라로부터 마우스 커서를 통과하는 광선을 쏘기 위해서 필요
 
     public void initialSetUp()
     {
         this.blocks = new BlockControl[Block.BLOCK_NUM_X, Block.BLOCK_NUM_Y]; // 그리드의 크기를 9×9로
         int color_index = 0; // 블록의 색 번호
+        Block.COLOR color = Block.COLOR.FIRST;
         for (int y = 0; y < Block.BLOCK_NUM_Y; y++)
         { // 처음~마지막행
             for (int x = 0; x < Block.BLOCK_NUM_X; x++)
@@ -32,8 +39,10 @@ public class BlockRoot : MonoBehaviour
                 block.block_root = this; // 각 BlockControl이 연계할 GameRoot는 자신이라고 설정
                 Vector3 position = BlockRoot.calcBlockPosition(block.i_pos); // 그리드 좌표를 실제 위치(scene의 좌표)로 변환
                 block.transform.position = position; // 씬의 블록 위치를 이동
-                block.setColor((Block.COLOR)color_index); // 블록의 색을 변경
+                //block.setColor((Block.COLOR)color_index); // 블록의 색을 변경
                                                           // 블록의 이름을 설정(후술)한다. 나중에 블록 정보 확인때 필요
+                color = this.selectBlockColor();
+                block.setColor(color);
                 block.name = "block(" + block.i_pos.x.ToString() + "," + block.i_pos.y.ToString() + ")";
                 // 전체 색 중에서 임의로 하나의 색을 선택
                 color_index = Random.Range(0, (int)Block.COLOR.NORMAL_COLOR_NUM);
@@ -57,23 +66,24 @@ public class BlockRoot : MonoBehaviour
         Vector2 mouse_position_xy = new Vector2(mouse_position.x, mouse_position.y); // 가져온 마우스 위치를 하나의 Vector2로 모음
         if (this.grabbed_block == null)
         { // 잡은 블록이 비었으면
-          // if (!this.is_has_falling_block()) { // 나중에 주석 해제
-            if (Input.GetMouseButtonDown(0))
-            { // 마우스 버튼이 눌렸으면
-                foreach (BlockControl block in this.blocks)
-                { // blocks 배열의 모든 요소를 차례로 처리
-                    if (!block.isGrabbable())
-                    { // 블록을 잡을 수 없다면
-                        continue;
-                    } // 루프의 처음으로 점프
-                    if (!block.isContainedPosition(mouse_position_xy))
-                    { // 마우스 위치가 블록 영역 안이 아니면
-                        continue;
-                    } // 루프의 처음으로 점프
-                    this.grabbed_block = block; // 처리 중인 블록을 grabbed_block에 등록
-                    this.grabbed_block.beginGrab(); break;
-                } // 잡았을 때의 처리를 실행
-            } // }
+            if (!this.is_has_falling_block()) { // 나중에 주석 해제
+                if (Input.GetMouseButtonDown(0))
+                { // 마우스 버튼이 눌렸으면
+                    foreach (BlockControl block in this.blocks)
+                    { // blocks 배열의 모든 요소를 차례로 처리
+                        if (!block.isGrabbable())
+                        { // 블록을 잡을 수 없다면
+                            continue;
+                        } // 루프의 처음으로 점프
+                        if (!block.isContainedPosition(mouse_position_xy))
+                        { // 마우스 위치가 블록 영역 안이 아니면
+                            continue;
+                        } // 루프의 처음으로 점프
+                        this.grabbed_block = block; // 처리 중인 블록을 grabbed_block에 등록
+                        this.grabbed_block.beginGrab(); break;
+                    } // 잡았을 때의 처리를 실행
+                } 
+            }
         }
         else
         { // 블록을 잡았을 때
@@ -127,6 +137,12 @@ public class BlockRoot : MonoBehaviour
             }
             if (ignite_count > 0)
             { // 불붙은 개수가 0보다 크면 ＝ 한 군데라도 맞춰진 곳이 있음
+                if (!this.is_vanishing_prev)
+                {
+                    this.score_counter.clearIgniteCount(); // 연속 점화가 아니라면, 점화 횟수를 리셋
+                }
+                this.score_counter.addIgniteCount(ignite_count);// 점화 횟수를 증가
+                this.score_counter.updateTotalScore(); // 합계 점수 갱신
                 int block_count = 0; // 불붙는 중인 블록 수(다음 장에서 사용)
                                      // 그리드 내의 모든 블록에 대해서 처리
                 foreach (BlockControl block in this.blocks)
@@ -134,10 +150,49 @@ public class BlockRoot : MonoBehaviour
                     if (block.isVanishing())
                     { // 타는 중이면
                         block.rewindVanishTimer(); // 다시 점화!
+                        block_count++; // 발화 중인 블록 개수를 증가
                     }
                 }
             }
         }
+        bool is_vanishing = this.is_has_vanishing_block(); // 하나라도 연소 중인 블록이 있는가?.
+        do
+        {
+            if (is_vanishing) { break; } // 연소 중인 블록이 있다면, 낙하 처리를 실행하지 않는다.
+            if (this.is_has_sliding_block()) { break; } // 교체 중인 블록이 있다면, 낙하 처리를 실행하지 않는다.
+            for (int x = 0; x < Block.BLOCK_NUM_X; x++)
+            {
+                if (this.is_has_sliding_block_in_column(x))
+                { // 열에 교체 중인 블록이 있다면 그 열은 처리하지 않고 다음 열로 진행.
+                    continue;
+                }
+                for (int y = 0; y < Block.BLOCK_NUM_Y - 1; y++)
+                {// 그 열에 있는 블록을 위에서부터 검사한다.
+                    if (!this.blocks[x, y].isVacant())
+                    { // 지정 블록이 비표시라면 다음 블록으로.
+                        continue;
+                    }
+                    for (int y1 = y + 1; y1 < Block.BLOCK_NUM_Y; y1++)
+                    { // 지정 블록 아래에 있는 블록을 검사.
+                        if (this.blocks[x, y1].isVacant()) { continue; } // 아래에 있는 블록이 비표시라면 다음 블록으로.
+                        this.fallBlock(this.blocks[x, y], Block.DIR4.UP, this.blocks[x, y1]); // 블록을 교체한다.
+                        break;
+                    }
+                }
+            }
+            for (int x = 0; x < Block.BLOCK_NUM_X; x++)
+            { // 보충처리.
+                int fall_start_y = Block.BLOCK_NUM_Y;
+                for (int y = 0; y < Block.BLOCK_NUM_Y; y++)
+                {
+                    if (!this.blocks[x, y].isVacant()) { continue; } // 비표시 블록이 아니라면 다음 블록으로.
+                    this.blocks[x, y].beginRespawn(fall_start_y); // 블록 부활.
+                    fall_start_y++;
+                }
+            }
+        } while (false);
+        this.is_vanishing_prev = is_vanishing;
+
     }
     public bool unprojectMousePosition(out Vector3 world_position, Vector3 mouse_position)
     {
@@ -361,6 +416,76 @@ public class BlockRoot : MonoBehaviour
             }
         }
         return (ret);
+    }
+    public void fallBlock(BlockControl block0, Block.DIR4 dir, BlockControl block1)
+    { // 낙하했을 때 위아래 블록을 교체한다.
+      // block0과 block1의 색, 크기, 사라질 때까지 걸리는 시간, 표시, 비표시, 상태를 기록.
+        Block.COLOR color0 = block0.color;
+        Block.COLOR color1 = block1.color;
+        Vector3 scale0 = block0.transform.localScale;
+        Vector3 scale1 = block1.transform.localScale;
+        float vanish_timer0 = block0.vanish_timer;
+        float vanish_timer1 = block1.vanish_timer;
+        bool visible0 = block0.isVisible();
+        bool visible1 = block1.isVisible();
+        Block.STEP step0 = block0.step;
+        Block.STEP step1 = block1.step;
+        // block0과 block1의 각종 속성을 교체한다.
+        block0.setColor(color1);
+        block1.setColor(color0);
+        block0.transform.localScale = scale1;
+        block1.transform.localScale = scale0;
+        block0.vanish_timer = vanish_timer1;
+        block1.vanish_timer = vanish_timer0;
+        block0.setVisible(visible1);
+        block1.setVisible(visible0);
+        block0.step = step1;
+        block1.step = step0;
+        block0.beginFall(block1);
+    }
+    private bool is_has_sliding_block_in_column(int x)
+    { // 지정된 그리드 좌표의 열(세로 줄)에 슬라이드 중인 블록이 하나라도 있으면, true를 반환한다.
+        bool ret = false;
+        for (int y = 0; y < Block.BLOCK_NUM_Y; y++)
+        {
+            if (this.blocks[x, y].isSliding())
+            { // 슬라이드 중인 블록이 있으면,
+                ret = true; // true를 반환한다.
+                break;
+            }
+        }
+        return (ret);
+    }
+    public void create()
+    { // 레벨 데이터의 초기화, 로드, 패턴 설정까지 시행
+        this.level_control = new LevelControl();
+        this.level_control.initialize(); // 레벨 데이터 초기화
+        this.level_control.loadLevelData(this.levelData); // 데이터 읽기
+        this.level_control.selectLevel(); // 레벨 선택
+    }
+    public Block.COLOR selectBlockColor()
+    { // 현재 패턴의 출현 확률을 바탕으로 색을 산출해서 반환
+        Block.COLOR color = Block.COLOR.FIRST;
+        // 이번 레벨의 레벨 데이터를 가져옴
+        LevelData level_data = this.level_control.getCurrentLevelData();
+        float rand = Random.Range(0.0f, 1.0f); // 0.0~1.0 사이의 난수
+        float sum = 0.0f; // 출현 확률의 합계
+        int i = 0;
+        // 블록의 종류 전체를 처리하는 루프
+        for (i = 0; i < level_data.probability.Length - 1; i++)
+        {
+            if (level_data.probability[i] == 0.0f)
+            {
+                continue; // 출현 확률이 0이면 루프의 처음으로 점프
+            }
+            sum += level_data.probability[i]; // 출현 확률을 더함
+            if (rand < sum)
+            { // 합계가 난숫값을 웃돌면
+                break; // 루프를 빠져나옴
+            }
+        }
+        color = (Block.COLOR)i; // i번째 색을 반환
+        return (color);
     }
 }
 
