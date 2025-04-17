@@ -12,7 +12,7 @@ public class ScoreCounter : MonoBehaviour
     };
     public Count last; // 마지막(이번) 점수
     public Count best; // 최고 점수
-    public static int QUOTA_SCORE = 100; // 클리어 하는 데 필요한 점수
+    public static int QUOTA_SCORE = 10000; // 클리어 하는 데 필요한 점수
     public GUIStyle guistyle; // 폰트 스타일
     void Start()
     {
