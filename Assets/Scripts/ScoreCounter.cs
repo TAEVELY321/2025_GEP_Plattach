@@ -12,7 +12,8 @@ public class ScoreCounter : MonoBehaviour
     };
     public Count last; // 마지막(이번) 점수
     public Count best; // 최고 점수
-    public static int QUOTA_SCORE = 10000; // 클리어 하는 데 필요한 점수
+    //public static int QUOTA_SCORE = 100; // 클리어 하는 데 필요한 점수
+    public float gameDuration = 60.0f; // 게임 시간
     public GUIStyle guistyle; // 폰트 스타일
     void Start()
     {
@@ -63,8 +64,10 @@ public class ScoreCounter : MonoBehaviour
         this.last.total_socre += this.last.score;
     }
     // 게임을 클리어했는지 판정 (SceneControl에서 사용)
+    /*
     public bool isGameClear()
     {
+
         bool is_clear = false;
         // 현재 합계 점수가 클리어 기준보다 크면
         if (this.last.total_socre > QUOTA_SCORE)
@@ -73,4 +76,5 @@ public class ScoreCounter : MonoBehaviour
         }
         return (is_clear);
     }
+    */
 }

@@ -148,7 +148,9 @@ public class BlockControl : MonoBehaviour
             {
                 case Block.STEP.IDLE: // '대기' 상태
                     this.position_offset = Vector3.zero;
-                    this.transform.localScale = Vector3.one * 1.0f; break; // 블록 표시 크기를 보통 크기로 함
+                    this.transform.localScale = Vector3.one * 1.0f;  // 블록 표시 크기를 보통 크기로 함
+                    this.transform.rotation = Quaternion.identity; // 블록 회전 초기
+                    break;
                 case Block.STEP.GRABBED: // ＇잡힌＇ 상태
                     this.transform.localScale = Vector3.one * 1.2f; break; // 블록 표시 크기를 크게 한다
                 case Block.STEP.RELEASED: // '떨어져 있는' 상태
@@ -197,6 +199,8 @@ public class BlockControl : MonoBehaviour
         this.setColor(this.color);
         if (this.vanish_timer >= 0.0f)
         {
+            this.transform.Rotate(Vector3.forward, 369f * Time.deltaTime); // 블록을 회전시킴
+
             float vanish_time = this.block_root.level_control.getVanishTime();
             Color color0 = Color.Lerp(this.GetComponent<Renderer>().material.color, Color.white, 0.5f); // 현재 색과 흰색의 중간 색
             Color color1 = Color.Lerp(this.GetComponent<Renderer>().material.color, Color.black, 0.5f); // 현재 색과 검은색의 중간 색

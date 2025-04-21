@@ -1,62 +1,83 @@
-using System.Collections;
+ï»¿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 public class SceneControl : MonoBehaviour
 {
     private ScoreCounter score_counter = null;
+    private ScoreEntry closestEntry = null;
     public enum STEP
     {
         NONE = -1, PLAY = 0, CLEAR, NUM,
-    }; // »óÅÂ Á¤º¸ ¾øÀ½, ÇÃ·¹ÀÌ Áß, Å¬¸®¾î, »óÅÂÀÇ Á¾·ù(= 2)
-    public STEP step = STEP.NONE; // ÇöÀç »óÅÂ
-    public STEP next_step = STEP.NONE; // ´ÙÀ½ »óÅÂ
-    public float step_timer = 0.0f; // °æ°ú ½Ã°£
-    private float clear_time = 0.0f; // Å¬¸®¾î ½Ã°£
-    public GUIStyle guistyle; // ÆùÆ® ½ºÅ¸ÀÏ
+    }; // ìƒíƒœ ì •ë³´ ì—†ìŒ, í”Œë ˆì´ ì¤‘, í´ë¦¬ì–´, ìƒíƒœì˜ ì¢…ë¥˜(= 2)
+    public STEP step = STEP.NONE; // í˜„ì¬ ìƒíƒœ
+    public STEP next_step = STEP.NONE; // ë‹¤ìŒ ìƒíƒœ
+    private float remainingTime;
+    public float score = 0.0f; // ì ìˆ˜
+    public float step_timer = 0.0f; // ê²½ê³¼ ì‹œê°„
+    private float clear_time = 0.0f; // í´ë¦¬ì–´ ì‹œê°„
+    public GUIStyle guistyle; // í°íŠ¸ ìŠ¤íƒ€ì¼
     private BlockRoot block_root = null;
     void Start()
     {
-        // BlockRoot ½ºÅ©¸³Æ®¸¦ °¡Á®¿È
+        // BlockRoot ìŠ¤í¬ë¦½íŠ¸ë¥¼ ê°€ì ¸ì˜´
         this.block_root = this.gameObject.GetComponent<BlockRoot>();
-        this.block_root.create(); // create() ¸Ş¼­µå¿¡¼­ ÃÊ±â ¼³Á¤
-        // BlockRoot ½ºÅ©¸³Æ®ÀÇ initialSetUp()À» È£Ãâ
+        this.block_root.create(); // create() ë©”ì„œë“œì—ì„œ ì´ˆê¸° ì„¤ì •
+        // BlockRoot ìŠ¤í¬ë¦½íŠ¸ì˜ initialSetUp()ì„ í˜¸ì¶œ
         this.block_root.initialSetUp();
-        this.score_counter = this.gameObject.GetComponent<ScoreCounter>(); // ScoreCounter °¡Á®¿À±â
-        this.next_step = STEP.PLAY; // ´ÙÀ½ »óÅÂ¸¦ 'ÇÃ·¹ÀÌ Áß'À¸·Î
-        this.guistyle.fontSize = 24; // ÆùÆ® Å©±â¸¦ 24·Î
+        this.score_counter = this.gameObject.GetComponent<ScoreCounter>(); // ScoreCounter ê°€ì ¸ì˜¤ê¸°
+        this.next_step = STEP.PLAY; // ë‹¤ìŒ ìƒíƒœë¥¼ 'í”Œë ˆì´ ì¤‘'ìœ¼ë¡œ
+        this.guistyle.fontSize = 24; // í°íŠ¸ í¬ê¸°ë¥¼ 24ë¡œ
+        this.remainingTime = score_counter.gameDuration; // ë‚¨ì€ ì‹œê°„ ì´ˆê¸°í™”
     }
     void Update()
     {
         this.step_timer += Time.deltaTime;
+        if (this.step == STEP.CLEAR && Input.GetKeyDown(KeyCode.Space))
+        {
+            SceneManager.LoadScene("TitleScene");
+        }
         if (this.next_step == STEP.NONE)
-        {// »óÅÂ º¯È­ ´ë±â -----.
+        {// ìƒíƒœ ë³€í™” ëŒ€ê¸° -----.
             switch (this.step)
             {
                 case STEP.PLAY:
-                    if (this.score_counter.isGameClear()) { this.next_step = STEP.CLEAR; } // Å¬¸®¾î Á¶°ÇÀ» ¸¸Á·ÇÏ¸é, Å¬¸®¾î »óÅÂ·Î ÀÌÇà
-                    break;
-            }
-            switch (this.step)
-            {
-                case STEP.CLEAR:
-                    if (Input.GetMouseButtonDown(0))
+                    this.remainingTime -= Time.deltaTime; // ë‚¨ì€ ì‹œê°„ ê°ì†Œ
+                    if(this.remainingTime <= 0.0f)
                     {
-                        SceneManager.LoadScene("TitleScene");
+                        this.remainingTime = 0.0f;
+                        this.next_step = STEP.CLEAR; // ë‚¨ì€ ì‹œê°„ì´ 0ì´ ë˜ë©´ í´ë¦¬ì–´ ìƒíƒœë¡œ ì „í™˜
                     }
+                    UpdateClosestScore(); // ê°€ì¥ ê·¼ì ‘í•œ ê¸°ë¡ ì—…ë°ì´íŠ¸
+                    //if (this.score_counter.isGameClear()) { this.next_step = STEP.CLEAR; } // í´ë¦¬ì–´ ì¡°ê±´ì„ ë§Œì¡±í•˜ë©´, í´ë¦¬ì–´ ìƒíƒœë¡œ ì´í–‰
                     break;
             }
+            
         }
         while (this.next_step != STEP.NONE)
-        { // »óÅÂ°¡ º¯È­Çß´Ù¸é ------
+        { // ìƒíƒœê°€ ë³€í™”í–ˆë‹¤ë©´ ------
             this.step = this.next_step;
             this.next_step = STEP.NONE;
             switch (this.step)
             {
                 case STEP.CLEAR:
                     
-                    this.block_root.enabled = false; // block_root¸¦ Á¤Áö
-                    this.clear_time = this.step_timer; // °æ°ú ½Ã°£À» Å¬¸®¾î ½Ã°£À¸·Î ¼³Á¤
+                    this.block_root.enabled = false; // block_rootë¥¼ ì •ì§€
+                    this.clear_time = this.step_timer; // ê²½ê³¼ ì‹œê°„ì„ í´ë¦¬ì–´ ì‹œê°„ìœ¼ë¡œ ì„¤ì •
+                    this.score = this.score_counter.last.total_socre; // ì ìˆ˜ë¥¼ í´ë¦¬ì–´ ì ìˆ˜ë¡œ ì„¤ì •
+
+                    string nickname = PlayerPrefs.GetString("nickname", "í”Œë ˆì´ì–´");
+                    int score = this.score_counter.last.total_socre;
+                    //int time = Mathf.CeilToInt(this.clear_time); // í´ë¦¬ì–´ ì‹œê°„
+
+                    Leaderboard lb = new Leaderboard();
+                    lb.Load();
+                    lb.AddScore(nickname, score);
+                    lb.Save();
+                    foreach (var entry in lb.scores)
+                    {
+                        Debug.Log($"{entry.nickname} - {entry.score}ì ");
+                    }
                     
                     break;
             }
@@ -68,19 +89,69 @@ public class SceneControl : MonoBehaviour
         switch (this.step)
         {
             case STEP.PLAY:
-                GUI.color = Color.black;
-                // °æ°ú ½Ã°£À» Ç¥½Ã
-                GUI.Label(new Rect(40.0f, 10.0f, 200.0f, 20.0f), "½Ã°£" + Mathf.CeilToInt(this.step_timer).ToString() + "ÃÊ", guistyle);
-                GUI.color = Color.white;
+                
+                if (this.step == STEP.PLAY)
+                {
+                    GUI.color = Color.black;
+                    GUI.Label(new Rect(40.0f, 10.0f, 200.0f, 20.0f), "ì‹œê°„" + Mathf.CeilToInt(this.remainingTime).ToString() + "ì´ˆ", guistyle);
+                    GUI.color = Color.white;
+
+                    if (isNewRecord)
+                    {
+                        GUI.Label(new Rect(Screen.width - 280, 10, 250, 60), "ğŸ‰ ì‹ ê¸°ë¡ ë‹¬ì„±!", guistyle);
+                    }
+                    else if (closestEntry != null)
+                    {
+                        string msg = $"ê°€ì¥ ê·¼ì ‘í•œ ê¸°ë¡\n{closestEntry.nickname} / {closestEntry.score}ì ";
+                        GUI.Label(new Rect(Screen.width - 280, 10, 250, 60), msg, guistyle);
+                    }
+                }
+
                 break;
             case STEP.CLEAR:
                 GUI.color = Color.black;
-                // ¡¸¡ÙÅ¬¸®¾î-£¡¡Ù¡¹¶ó´Â ¹®ÀÚ¿­À» Ç¥½Ã
-                GUI.Label(new Rect(Screen.width / 2.0f - 80.0f, 20.0f, 200.0f, 20.0f), "¡ÙÅ¬¸®¾î-!¡Ù", guistyle);
-                // Å¬¸®¾î ½Ã°£À» Ç¥½Ã
-                GUI.Label(new Rect(Screen.width / 2.0f - 80.0f, 40.0f, 200.0f, 20.0f), "Å¬¸®¾î ½Ã°£" + Mathf.CeilToInt(this.clear_time).ToString() + "ÃÊ", guistyle);
+                // ã€Œâ˜†í´ë¦¬ì–´-ï¼â˜†ã€ë¼ëŠ” ë¬¸ìì—´ì„ í‘œì‹œ
+                GUI.Label(new Rect(Screen.width / 2.0f - 80.0f, 20.0f, 200.0f, 20.0f), "â˜†í´ë¦¬ì–´-!â˜†", guistyle);
+                // í´ë¦¬ì–´ ì‹œê°„ì„ í‘œì‹œ
+                GUI.Label(new Rect(Screen.width / 2.0f - 80.0f, 40.0f, 200.0f, 20.0f), "ì ìˆ˜" + Mathf.CeilToInt(this.score).ToString() + "ì ", guistyle);
                 GUI.color = Color.white;
                 break;
         }
     }
+    private bool isNewRecord = false;
+
+    void UpdateClosestScore()
+    {
+        int myScore = score_counter.last.total_socre;
+
+        Leaderboard lb = new Leaderboard();
+        lb.Load();
+
+        isNewRecord = false;
+        closestEntry = null;
+
+        ScoreEntry lowestAboveMine = null;
+
+        foreach (var entry in lb.scores)
+        {
+            if (entry.score > myScore)
+            {
+                if (lowestAboveMine == null || entry.score < lowestAboveMine.score)
+                {
+                    lowestAboveMine = entry;
+                }
+            }
+        }
+
+        if (lowestAboveMine == null)
+        {
+            // ë‚´ ì ìˆ˜ë³´ë‹¤ ë†’ì€ ì ìˆ˜ê°€ ì—†ë‹¤ = ì‹ ê¸°ë¡
+            isNewRecord = true;
+        }
+        else
+        {
+            closestEntry = lowestAboveMine;
+        }
+    }
+
 }
